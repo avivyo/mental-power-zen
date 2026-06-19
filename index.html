@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+  <title>Mental Power Zen — מערכת ביצועים לספורטאי עילית</title>
+  <meta name="description" content="פלטפורמת ניהול ביצועים לספורטאי נוער תחרותיים — עומס, תחושה, מנטל, תזונה ושיקום בממשק אחד." />
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#7c3aed" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="MPZ" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+
+  <!-- Open Graph -->
+  <meta property="og:title"       content="Mental Power Zen" />
+  <meta property="og:description" content="מערכת ביצועים לספורטאי עילית" />
+  <meta property="og:image"       content="/icon-512.png" />
+  <meta property="og:type"        content="website" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Supabase — no defer: must be available synchronously before app.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="index.css" />
+</head>
+<body>
+
+  <!-- =========================================================
+    DEV PANEL — destroyed at runtime on non-localhost
+    (enforceProductionHardening IIFE in app.js Section 1)
+  ========================================================== -->
+  <div id="dev-panel" role="complementary" aria-label="Developer Controls">
+    <span class="dev-panel-label">🛠 מצב פיתוח</span>
+    <div class="dev-panel-controls">
+      <button class="dev-btn" onclick="devRole('coach')">Coach</button>
+      <button class="dev-btn" onclick="devRole('psychologist')">Psych</button>
+      <button class="dev-btn" onclick="devRole('nutritionist')">Nutri</button>
+      <button class="dev-btn" onclick="devRole('fitness_coach')">Fitness</button>
+      <button class="dev-btn" onclick="devRole('athlete')">Athlete</button>
+      <button class="dev-btn" onclick="devRole('pending')">Pending</button>
+    </div>
+  </div>
+
+  <!-- =========================================================
+    PRIMARY APP ROOT — all view HTML injected here by app.js
+  ========================================================== -->
+  <div id="app-root" role="main" aria-live="polite">
+    <div class="splash-loader">
+      <div class="splash-logo">
+        <div class="splash-icon">⚡</div>
+        <h1 class="splash-title">Mental Power Zen</h1>
+        <p class="splash-subtitle">מאתחל מערכת...</p>
+        <div class="splash-bar"><div class="splash-bar-fill"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase D Extensions: Realtime, Toast, Print -->
+  <script src="phase_d_extensions.js" defer></script>
+
+  <!-- App Engine -->
+  <script src="app.js" defer></script>
+
+  <!-- Service Worker registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('[SW] registered, scope:', reg.scope))
+          .catch(err => console.warn('[SW] registration failed:', err));
+      });
+    }
+  </script>
+
+  <!-- Dev helpers (stripped in prod) -->
+  <script>
+    function devRole(role) {
+      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') return;
+      window.currentProfile = window.currentProfile || {};
+      window.currentProfile.role = role;
+      window.currentProfile.status = role === 'pending' ? 'pending' : 'active';
+      window.currentProfile.full_name = window.currentProfile.full_name || 'מפתח בדיקה';
+      window.currentProfile.is_team_admin = (role === 'coach');
+      window.currentTeam = window.currentTeam || { name: 'קבוצת בדיקה', code: 'TST001' };
+      if (typeof renderView === 'function') renderView(role);
+    }
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,28 @@
+{
+  "name": "Mental Power Zen",
+  "short_name": "MPZ",
+  "description": "מערכת ביצועים לספורטאי עילית — עומס, תחושה, מנטל, תזונה",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0d0f1a",
+  "theme_color": "#7c3aed",
+  "lang": "he",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["sports", "health", "productivity"]
+}
