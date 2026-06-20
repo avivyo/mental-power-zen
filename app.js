@@ -1,5 +1,5 @@
 // =============================================================================
-// Mental Power Zen — Core Application Engine  (app.js)
+// RightPace — Core Application Engine  (app.js)
 // Version: 2.0.0-production
 // Architecture: Multi-tenant teams, self-registration, 2-slider daily report,
 //               Chart.js visualizations, LWW sync, XOR obfuscation
@@ -31,7 +31,7 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 // =============================================================================
 // SECTION 2: XOR OBFUSCATION STORAGE UTILITY
 // =============================================================================
-const XOR_KEY = 'MPZ-2025-ULTRA-SECURE-KEY';
+const XOR_KEY = 'RIGHTPACE-2025-SECURE-KEY';
 
 function encryptData(plaintext) {
   if (typeof plaintext !== 'string') plaintext = JSON.stringify(plaintext);
@@ -712,7 +712,7 @@ function renderAuthView() {
     <div class="auth-container glass-card">
       <div class="auth-logo">
         <div class="logo-icon">⚡</div>
-        <h1 class="auth-title">Mental Power Zen</h1>
+        <h1 class="auth-title">RightPace</h1>
         <p class="auth-subtitle">מערכת ביצועים לספורטאי עילית</p>
       </div>
 
