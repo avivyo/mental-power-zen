@@ -1,7 +1,7 @@
-// Mental Power Zen — Service Worker v1.2
+// RightPace — Service Worker v1.2
 // Caches app shell for offline support + background sync
 
-const CACHE_NAME  = 'mpz-v1.2';
+const CACHE_NAME  = 'rightpace-v1.2';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
