@@ -704,6 +704,55 @@ function renderTeamSetupView() {
 }
 
 // =============================================================================
+// PASSWORD RESET VIEW — shown when user clicks the email reset link
+// =============================================================================
+function renderPasswordResetView() {
+  const root = document.getElementById('app-root');
+  root.innerHTML = `
+    <div class="auth-container glass-card">
+      <div class="auth-logo">
+        <div class="logo-icon">🔑</div>
+        <h1 class="auth-title">הגדר סיסמא חדשה</h1>
+        <p class="auth-subtitle">הזן סיסמא חדשה עבור החשבון שלך</p>
+      </div>
+      <div style="padding: var(--sp-lg) 0;">
+        <div class="form-group">
+          <label class="form-label" for="new-pw">סיסמא חדשה</label>
+          <input type="password" id="new-pw" class="form-input" placeholder="לפחות 6 תווים" minlength="6" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="new-pw-confirm">אימות סיסמא</label>
+          <input type="password" id="new-pw-confirm" class="form-input" placeholder="חזור על הסיסמא" />
+        </div>
+        <div id="new-pw-error" class="auth-error hidden"></div>
+        <button class="btn btn-primary btn-full" id="new-pw-btn">
+          <span id="new-pw-btn-text">שמור סיסמא חדשה</span>
+          <span id="new-pw-spinner" class="spinner hidden"></span>
+        </button>
+      </div>
+    </div>
+  `;
+  document.getElementById('new-pw-btn').addEventListener('click', async () => {
+    const pw1   = document.getElementById('new-pw').value;
+    const pw2   = document.getElementById('new-pw-confirm').value;
+    const errEl = document.getElementById('new-pw-error');
+    errEl.classList.add('hidden');
+    if (pw1.length < 6) { errEl.textContent = 'הסיסמא חייבת להכיל לפחות 6 תווים'; errEl.classList.remove('hidden'); return; }
+    if (pw1 !== pw2)    { errEl.textContent = 'הסיסמאות אינן תואמות'; errEl.classList.remove('hidden'); return; }
+    setLoading('new-pw-btn', 'new-pw-btn-text', 'new-pw-spinner', true);
+    const { error } = await _supabase.auth.updateUser({ password: pw1 });
+    setLoading('new-pw-btn', 'new-pw-btn-text', 'new-pw-spinner', false);
+    if (error) {
+      errEl.textContent = error.message || 'שגיאה — נסה שוב';
+      errEl.classList.remove('hidden');
+    } else {
+      const profile = await loadCurrentProfile();
+      routeByProfile(profile);
+    }
+  });
+}
+
+// =============================================================================
 // SECTION 8: AUTH VIEW — Login + Register tabs
 // =============================================================================
 function renderAuthView() {
@@ -737,7 +786,25 @@ function renderAuthView() {
             <span id="login-btn-text">כניסה למערכת</span>
             <span id="login-spinner" class="spinner hidden"></span>
           </button>
+          <div style="text-align:center; margin-top: var(--sp-sm);">
+            <button type="button" id="forgot-pw-btn" class="link-btn">שכחתי סיסמה</button>
+          </div>
         </form>
+
+        <!-- Forgot-password inline panel (hidden by default) -->
+        <div id="forgot-pw-panel" class="hidden" style="margin-top: var(--sp-lg);">
+          <p style="font-size:var(--fs-sm); color:var(--text-secondary); margin-bottom:var(--sp-sm);">
+            הזן את האימייל שלך ונשלח לך קישור לאיפוס סיסמה
+          </p>
+          <div class="form-group">
+            <input type="email" id="reset-email" class="form-input" placeholder="name@example.com" />
+          </div>
+          <div id="reset-error" class="auth-error hidden"></div>
+          <button class="btn btn-primary btn-full" id="reset-send-btn">שלח קישור</button>
+          <div id="reset-success" class="hidden" style="color:var(--status-green); font-size:var(--fs-sm); text-align:center; margin-top:var(--sp-sm);">
+            ✅ שלחנו! בדוק את תיבת הדואר שלך
+          </div>
+        </div>
       </div>
 
       <!-- REGISTER PANEL -->
@@ -810,6 +877,39 @@ function renderAuthView() {
   // Team code → uppercase
   document.getElementById('reg-team-code')?.addEventListener('input', (e) => {
     e.target.value = e.target.value.toUpperCase();
+  });
+
+  // FORGOT PASSWORD — toggle panel
+  document.getElementById('forgot-pw-btn').addEventListener('click', () => {
+    const panel = document.getElementById('forgot-pw-panel');
+    panel.classList.toggle('hidden');
+    if (!panel.classList.contains('hidden')) {
+      const loginEmail = document.getElementById('login-email').value.trim();
+      if (loginEmail) document.getElementById('reset-email').value = loginEmail;
+      document.getElementById('reset-email').focus();
+    }
+  });
+
+  // FORGOT PASSWORD — send reset email
+  document.getElementById('reset-send-btn').addEventListener('click', async () => {
+    const email = document.getElementById('reset-email').value.trim();
+    const errEl = document.getElementById('reset-error');
+    const okEl  = document.getElementById('reset-success');
+    errEl.classList.add('hidden');
+    okEl.classList.add('hidden');
+    if (!email) { errEl.textContent = 'יש להזין אימייל'; errEl.classList.remove('hidden'); return; }
+    const btn = document.getElementById('reset-send-btn');
+    btn.disabled = true; btn.textContent = 'שולח...';
+    const { error } = await _supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/?reset=1',
+    });
+    btn.disabled = false; btn.textContent = 'שלח קישור';
+    if (error) {
+      errEl.textContent = error.message || 'שגיאה — נסה שוב';
+      errEl.classList.remove('hidden');
+    } else {
+      okEl.classList.remove('hidden');
+    }
   });
 
   // LOGIN
@@ -3086,6 +3186,9 @@ function setLoading(btnId, textId, spinnerId, loading) {
 async function initApp() {
   // onAuthStateChange is registered FIRST so it wins over getSession
   _supabase.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      renderPasswordResetView(); return;
+    }
     if (event === 'SIGNED_IN' && session?.user) {
       _routingInProgress = true;   // lock while loading
       let profile = await loadCurrentProfile();
