@@ -1112,3 +1112,16 @@ ul, ol { list-style: none; }
   #toast-container { left: var(--sp-sm); right: var(--sp-sm); }
   .toast           { min-width: 0; width: 100%; }
 }
+
+/* Forgot-password link button */
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent-p-light);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  transition: opacity var(--t-fast);
+}
+.link-btn:hover { opacity: 0.75; }
