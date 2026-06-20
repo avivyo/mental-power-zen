@@ -49,7 +49,7 @@ function handleRealtimeRPE(payload) {
   showToast('📊 ' + name + ' דיווח — RPE: ' + rpe + ' | תחושה: ' + feel);
 
   if (document.hidden && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-    new Notification('Mental Power Zen ⚡', {
+    new Notification('RightPace ⚡', {
       body: name + ' דיווח: RPE ' + rpe + ', תחושה ' + feel,
       icon: '/icon-192.png',
       dir:  'rtl',
@@ -126,7 +126,7 @@ async function printCoachReport(roster, weekOffset) {
   </style>
 </head>
 <body>
-  <h1>Mental Power Zen ⚡ — דוח מאמן</h1>
+  <h1>RightPace ⚡ — דוח מאמן</h1>
   <p>שבוע: ${weekLabel} | קבוצה: ${currentTeam?.name ?? ''} | הודפס: ${new Date().toLocaleDateString('he-IL')}</p>
   <table>
     <thead>
