@@ -554,6 +554,7 @@ const ROLE_VIEWS = {
 };
 
 function renderView(role) {
+  // Hide splash screen on every view transition
   const splash = document.getElementById('splash-screen');
   if (splash) splash.classList.add('hidden');
   const fn = ROLE_VIEWS[role];
@@ -566,10 +567,13 @@ let _routingInProgress = false;
 let _profileLoaded     = false;   // true once a profile has been successfully routed
 
 function routeByProfile(profile) {
-  _routingInProgress = false;
+  _routingInProgress = false;  // clear — routing is happening now
   _profileLoaded     = true;
+
+  // Always hide splash screen regardless of auth result
   const splash = document.getElementById('splash-screen');
   if (splash) splash.classList.add('hidden');
+
   if (!profile)                      { renderView('auth');       return; }
   if (profile.status === 'pending')  { renderView('pending');    return; }
   if (!profile.team_id)              { renderView('team_setup'); return; }
@@ -1811,8 +1815,7 @@ async function renderTeamManagerView() {
       attachRosterEvents(roster);
 
     } else if (view === 'analytics') {
-      main.innerHTML = renderAnalyticsHTML(roster);
-      await renderAnalyticsCharts(roster);
+      await renderAnalyticsHTML(main);
 
     } else if (view === 'admin') {
       main.innerHTML = '<div class="loading-spinner-lg">טוען...</div>';
@@ -3569,3 +3572,4 @@ async function renderAdminPanel(container) {
     });
   });
 }
+
