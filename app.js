@@ -554,6 +554,8 @@ const ROLE_VIEWS = {
 };
 
 function renderView(role) {
+  const splash = document.getElementById('splash-screen');
+  if (splash) splash.classList.add('hidden');
   const fn = ROLE_VIEWS[role];
   if (!fn) { console.error('[ROUTER] Unknown role:', role); return; }
   fn();
@@ -564,9 +566,10 @@ let _routingInProgress = false;
 let _profileLoaded     = false;   // true once a profile has been successfully routed
 
 function routeByProfile(profile) {
-  _routingInProgress = false;  // clear — routing is happening now
+  _routingInProgress = false;
   _profileLoaded     = true;
-
+  const splash = document.getElementById('splash-screen');
+  if (splash) splash.classList.add('hidden');
   if (!profile)                      { renderView('auth');       return; }
   if (profile.status === 'pending')  { renderView('pending');    return; }
   if (!profile.team_id)              { renderView('team_setup'); return; }
