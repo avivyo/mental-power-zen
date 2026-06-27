@@ -3221,51 +3221,74 @@ function setLoading(btnId, textId, spinnerId, loading) {
 // SECTION 16: BOOTSTRAP
 // =============================================================================
 async function initApp() {
-  // onAuthStateChange is registered FIRST so it wins over getSession
+  // Safety net: if splash is still visible after 6 seconds, force auth screen
+  // Prevents black screen if Supabase/network hangs during cold start
+  const splashSafetyTimer = setTimeout(() => {
+    const splash = document.getElementById('splash-screen');
+    if (splash && !splash.classList.contains('hidden')) {
+      console.warn('[INIT] Splash safety timeout fired — forcing auth view');
+      splash.classList.add('hidden');
+      if (!_profileLoaded) renderView('auth');
+    }
+  }, 6000);
+
+  // onAuthStateChange handles BOTH the initial session check AND subsequent changes.
+  // In Supabase v2, on page load it fires INITIAL_SESSION (not SIGNED_IN) with the
+  // existing session — so we must handle INITIAL_SESSION exactly like SIGNED_IN.
   _supabase.auth.onAuthStateChange(async (event, session) => {
     if (event === 'PASSWORD_RECOVERY') {
+      clearTimeout(splashSafetyTimer);
       renderPasswordResetView(); return;
     }
-    if (event === 'SIGNED_IN' && session?.user) {
-      _routingInProgress = true;   // lock while loading
-      let profile = await loadCurrentProfile();
 
-      // Handle pending team action (registered but team not yet created/joined)
-      if (profile && !profile.team_id) {
-        const pending = getCache('pending_team_action');
-        if (pending) {
-          if (pending.action === 'create') {
-            await _supabase.rpc('create_team', { p_team_name: pending.value });
-          } else {
-            await _supabase.rpc('join_team', { p_code: pending.value });
+    // INITIAL_SESSION fires on page load; SIGNED_IN fires after explicit login
+    if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session?.user) {
+      if (_routingInProgress || _profileLoaded) return;  // already handled
+      _routingInProgress = true;
+      clearTimeout(splashSafetyTimer);
+
+      try {
+        let profile = await loadCurrentProfile();
+
+        // Handle pending team action (registered but team not yet created/joined)
+        if (profile && !profile.team_id) {
+          const pending = getCache('pending_team_action');
+          if (pending) {
+            if (pending.action === 'create') {
+              await _supabase.rpc('create_team', { p_team_name: pending.value });
+            } else {
+              await _supabase.rpc('join_team', { p_code: pending.value });
+            }
+            clearCache('pending_team_action');
+            profile = await loadCurrentProfile();
           }
-          clearCache('pending_team_action');
-          profile = await loadCurrentProfile();
         }
+        routeByProfile(profile);   // clears _routingInProgress
+
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+          setTimeout(() => {
+            if (typeof startRealtimeUpdates === 'function')          startRealtimeUpdates();
+            if (typeof requestNotificationPermission === 'function') requestNotificationPermission();
+          }, 1500);
+        }
+      } catch (err) {
+        console.error('[INIT] loadCurrentProfile failed:', err);
+        _routingInProgress = false;
+        renderView('auth');
       }
-      routeByProfile(profile);   // clears _routingInProgress
+
+    } else if (event === 'INITIAL_SESSION' && !session?.user) {
+      // Not logged in — show auth immediately
+      clearTimeout(splashSafetyTimer);
+      renderView('auth');
 
     } else if (event === 'SIGNED_OUT') {
+      clearTimeout(splashSafetyTimer);
       _profileLoaded     = false;
       _routingInProgress = false;
       renderView('auth');
     }
   });
-
-  // getSession only handles the cold-start case (page reload while already logged in)
-  // If onAuthStateChange already fired, skip to avoid double-routing
-  const { data: { session } } = await _supabase.auth.getSession();
-  if (session?.user && !_profileLoaded) {
-    _routingInProgress = true;
-    const profile = await loadCurrentProfile();
-    routeByProfile(profile);
-    setTimeout(() => {
-      if (typeof startRealtimeUpdates === 'function')          startRealtimeUpdates();
-      if (typeof requestNotificationPermission === 'function') requestNotificationPermission();
-    }, 1500);
-  } else if (!session?.user) {
-    renderView('auth');
-  }
 
   // Global signout delegation
   document.addEventListener('click', e => {
