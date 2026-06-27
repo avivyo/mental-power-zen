@@ -70,10 +70,17 @@ self.addEventListener('fetch', event => {
         }
         return response;
       })
-      .catch(() => {
+      .catch(async () => {
         // Offline fallback — serve from cache if network fails
-        return caches.match(event.request)
-          .then(cached => cached || caches.match('/index.html'));
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        const fallback = await caches.match('/index.html');
+        if (fallback) return fallback;
+        // Last resort — return a proper Response so SW doesn't crash
+        return new Response('Offline — check your connection', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
       })
   );
 });
