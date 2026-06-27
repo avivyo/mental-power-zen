@@ -3239,3 +3239,330 @@ async function initApp() {
 document.readyState === 'loading'
   ? document.addEventListener('DOMContentLoaded', initApp)
   : initApp();
+// =============================================================================
+// MISSING FUNCTIONS — יש להדביק אותן בתוך app.js
+// לפני הסוגר הסופי של renderTeamManagerView או בסוף הקובץ
+// =============================================================================
+
+// =============================================================================
+// attachRosterEvents — מצמיד אירועים לטבלת הרוסטר של המנהל
+// =============================================================================
+function attachRosterEvents(roster) {
+  // כפתורי פתיחת כרטיס ספורטאי
+  document.querySelectorAll('.roster-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const athleteId   = row.dataset.athleteId;
+      const athleteName = row.dataset.athleteName;
+      const athlete     = roster.find(a => a.athlete_id === athleteId);
+      if (athlete) openAthleteCard(athlete);
+    });
+  });
+}
+
+// פתיחת כרטיס ספורטאי (modal מפורט)
+function openAthleteCard(athlete) {
+  const existing = document.getElementById('athlete-card-modal');
+  if (existing) existing.remove();
+
+  const disc = athlete.discrepancy;
+  const modal = document.createElement('div');
+  modal.id = 'athlete-card-modal';
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal-card glass-card" style="max-width:520px;width:95%;">
+      <div class="modal-header">
+        <div class="athlete-avatar-lg">${athlete.full_name?.charAt(0) ?? '?'}</div>
+        <div>
+          <h2 style="margin:0;font-size:var(--fs-xl)">${athlete.full_name ?? 'ספורטאי'}</h2>
+          <span class="badge ${disc?.badge?.css ?? 'status-grey'}">${disc?.badge?.icon ?? ''} ${disc?.badge?.label ?? 'אין מידע'}</span>
+        </div>
+        <button id="close-athlete-card" class="btn-icon" style="margin-right:auto">✕</button>
+      </div>
+      <div class="modal-body" style="margin-top:var(--sp-md)">
+        <div class="stat-grid">
+          <div class="stat-box">
+            <span class="stat-label">RPE היום</span>
+            <span class="stat-val">${athlete.latestRPE ?? '—'}</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">תחושה</span>
+            <span class="stat-val">${athlete.latestFeeling ?? '—'}</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">עומס מתוכנן</span>
+            <span class="stat-val">${athlete.targetLoad ?? '—'}</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">סטייה</span>
+            <span class="stat-val">${disc?.variance ?? '—'}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.getElementById('close-athlete-card').addEventListener('click', () => modal.remove());
+}
+
+
+// =============================================================================
+// renderAnalyticsHTML — מרנדר את טאב "ניתוח" עבור מנהל הקבוצה
+// =============================================================================
+async function renderAnalyticsHTML(container) {
+  container.innerHTML = `<div style="text-align:center;padding:var(--sp-xl)"><div class="spinner"></div><p style="margin-top:var(--sp-md);color:var(--text-secondary)">טוען נתוני ניתוח...</p></div>`;
+
+  const roster = await fetchTeamRoster();
+
+  if (!roster.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📊</div>
+        <h3>אין נתונים לניתוח</h3>
+        <p>הוסף ספורטאים לקבוצה והם יתחילו לדווח RPE יומי.</p>
+      </div>`;
+    return;
+  }
+
+  const athleteIds = roster.map(a => a.athlete_id);
+  const rpeHistory = await fetchTeamRPEHistoryWeeks(athleteIds, 8);
+
+  // חישוב ממוצעים שבועיים
+  const weeklyMap = {};
+  rpeHistory.forEach(log => {
+    const d    = new Date(log.log_date);
+    const day  = d.getDay();
+    const diff = (day === 0 ? -6 : 1 - day);
+    d.setDate(d.getDate() + diff);
+    const wk   = d.toISOString().split('T')[0];
+    if (!weeklyMap[wk]) weeklyMap[wk] = { rpe: [], feeling: [] };
+    if (log.rpe_value     != null) weeklyMap[wk].rpe.push(log.rpe_value);
+    if (log.feeling_score != null) weeklyMap[wk].feeling.push(log.feeling_score);
+  });
+
+  const weeks   = Object.keys(weeklyMap).sort();
+  const avgRpe  = weeks.map(w => (weeklyMap[w].rpe.reduce((s, v) => s + v, 0) / (weeklyMap[w].rpe.length || 1)).toFixed(1));
+  const avgFeel = weeks.map(w => (weeklyMap[w].feeling.reduce((s, v) => s + v, 0) / (weeklyMap[w].feeling.length || 1)).toFixed(1));
+  const labels  = weeks.map(w => formatWeekRange(w));
+
+  // סטטוס היום
+  const green  = roster.filter(a => a.discrepancy?.status === 'GREEN').length;
+  const yellow = roster.filter(a => a.discrepancy?.status === 'YELLOW').length;
+  const red    = roster.filter(a => a.discrepancy?.status === 'RED').length;
+  const pending= roster.filter(a => a.discrepancy?.status === 'PENDING').length;
+
+  container.innerHTML = `
+    <div class="analytics-grid">
+
+      <!-- סיכום היום -->
+      <div class="analytics-section glass-card">
+        <h3 class="section-title">📊 מצב היום</h3>
+        <div class="disc-summary-grid">
+          <div class="disc-box green"><span class="disc-num">${green}</span><span class="disc-lbl">יישור מושלם 🟢</span></div>
+          <div class="disc-box yellow"><span class="disc-num">${yellow}</span><span class="disc-lbl">סטייה קלה 🟡</span></div>
+          <div class="disc-box red"><span class="disc-num">${red}</span><span class="disc-lbl">סטייה קריטית 🔴</span></div>
+          <div class="disc-box grey"><span class="disc-num">${pending}</span><span class="disc-lbl">ממתין ⏳</span></div>
+        </div>
+      </div>
+
+      <!-- גרף RPE שבועי -->
+      <div class="analytics-section glass-card">
+        <h3 class="section-title">📈 ממוצע RPE קבוצתי — 8 שבועות</h3>
+        <div style="position:relative;height:220px;">
+          <canvas id="analytics-rpe-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- גרף תחושה שבועי -->
+      <div class="analytics-section glass-card">
+        <h3 class="section-title">💚 ממוצע תחושה קבוצתית — 8 שבועות</h3>
+        <div style="position:relative;height:220px;">
+          <canvas id="analytics-feel-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- טבלת ספורטאים -->
+      <div class="analytics-section glass-card">
+        <h3 class="section-title">🏅 סטטוס ספורטאים</h3>
+        <div class="roster-table-wrap">
+          <table class="roster-table">
+            <thead>
+              <tr>
+                <th>ספורטאי</th>
+                <th>RPE</th>
+                <th>תחושה</th>
+                <th>עומס מתוכנן</th>
+                <th>סטטוס</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${roster.map(a => `
+                <tr>
+                  <td><div class="athlete-mini-avatar">${a.full_name?.charAt(0) ?? '?'}</div> ${a.full_name ?? '—'}</td>
+                  <td>${a.latestRPE ?? '—'}</td>
+                  <td>${a.latestFeeling ?? '—'}</td>
+                  <td>${a.targetLoad ?? '—'}</td>
+                  <td><span class="badge ${a.discrepancy?.badge?.css ?? 'status-grey'}">${a.discrepancy?.badge?.icon ?? ''} ${a.discrepancy?.badge?.label ?? 'אין'}</span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // בניית גרפים
+  requestAnimationFrame(() => {
+    const chartDefaults = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: 'rgba(255,255,255,0.6)', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: 'rgba(255,255,255,0.6)' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+      },
+    };
+
+    const rpeCtx = document.getElementById('analytics-rpe-chart');
+    if (rpeCtx && typeof Chart !== 'undefined') {
+      new Chart(rpeCtx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'ממוצע RPE',
+            data: avgRpe,
+            borderColor: '#7c3aed',
+            backgroundColor: 'rgba(124,58,237,0.15)',
+            tension: 0.4,
+            fill: true,
+            pointBackgroundColor: '#7c3aed',
+            pointRadius: 5,
+          }],
+        },
+        options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, min: 1, max: 10 } } },
+      });
+    }
+
+    const feelCtx = document.getElementById('analytics-feel-chart');
+    if (feelCtx && typeof Chart !== 'undefined') {
+      new Chart(feelCtx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'ממוצע תחושה',
+            data: avgFeel,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16,185,129,0.15)',
+            tension: 0.4,
+            fill: true,
+            pointBackgroundColor: '#10b981',
+            pointRadius: 5,
+          }],
+        },
+        options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, min: 1, max: 10 } } },
+      });
+    }
+  });
+}
+
+
+// =============================================================================
+// renderAdminPanel — פאנל ניהול: אישור חברים, הגדרות קבוצה
+// =============================================================================
+async function renderAdminPanel(container) {
+  container.innerHTML = `<div style="text-align:center;padding:var(--sp-xl)"><div class="spinner"></div></div>`;
+
+  const [pending, roster] = await Promise.all([
+    fetchPendingMembers(),
+    fetchTeamRoster(),
+  ]);
+
+  container.innerHTML = `
+    <div class="admin-grid">
+
+      <!-- בקשות הצטרפות ממתינות -->
+      <div class="admin-section glass-card">
+        <h3 class="section-title">🔔 בקשות הצטרפות ${pending.length > 0 ? `<span class="badge status-yellow">${pending.length}</span>` : ''}</h3>
+        ${pending.length === 0
+          ? `<p class="text-muted" style="text-align:center;padding:var(--sp-md)">אין בקשות ממתינות ✅</p>`
+          : `<div class="pending-list">
+              ${pending.map(m => `
+                <div class="pending-item glass-card" style="padding:var(--sp-sm) var(--sp-md);display:flex;align-items:center;gap:var(--sp-sm);margin-bottom:var(--sp-sm)">
+                  <div class="athlete-mini-avatar">${m.full_name?.charAt(0) ?? '?'}</div>
+                  <div style="flex:1">
+                    <div style="font-weight:600">${m.full_name ?? '—'}</div>
+                    <div style="font-size:var(--fs-sm);color:var(--text-secondary)">${m.email ?? ''} · ${m.role ?? ''}</div>
+                  </div>
+                  <button class="btn btn-primary btn-sm approve-btn" data-uid="${m.id}">✓ אשר</button>
+                  <button class="btn btn-ghost btn-sm reject-btn" data-uid="${m.id}">✕ דחה</button>
+                </div>
+              `).join('')}
+            </div>`
+        }
+      </div>
+
+      <!-- רוסטר פעיל -->
+      <div class="admin-section glass-card">
+        <h3 class="section-title">👥 חברי קבוצה פעילים (${roster.length})</h3>
+        ${roster.length === 0
+          ? `<p class="text-muted" style="text-align:center;padding:var(--sp-md)">אין ספורטאים פעילים עדיין</p>`
+          : `<div class="roster-list">
+              ${roster.map(a => `
+                <div class="roster-item" style="display:flex;align-items:center;gap:var(--sp-sm);padding:var(--sp-sm) 0;border-bottom:1px solid rgba(255,255,255,0.05)">
+                  <div class="athlete-mini-avatar">${a.full_name?.charAt(0) ?? '?'}</div>
+                  <span style="flex:1">${a.full_name ?? '—'}</span>
+                  <span class="badge ${a.discrepancy?.badge?.css ?? 'status-grey'}">${a.discrepancy?.badge?.icon ?? '⏳'}</span>
+                </div>
+              `).join('')}
+            </div>`
+        }
+      </div>
+
+      <!-- קוד הקבוצה -->
+      <div class="admin-section glass-card">
+        <h3 class="section-title">🔑 קוד הקבוצה</h3>
+        <div style="text-align:center;padding:var(--sp-md)">
+          <div class="team-code-display">${currentTeam?.code ?? '—'}</div>
+          <p class="text-muted" style="margin-top:var(--sp-sm);font-size:var(--fs-sm)">שתף קוד זה עם חברי הסגל כדי שיצטרפו לקבוצה</p>
+          <button class="btn btn-ghost" id="copy-team-code-btn" style="margin-top:var(--sp-sm)">📋 העתק קוד</button>
+        </div>
+      </div>
+
+    </div>
+  `;
+
+  // אישור/דחיית חברים
+  container.querySelectorAll('.approve-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const uid = btn.dataset.uid;
+      btn.disabled = true; btn.textContent = '...';
+      const { error } = await _supabase.from('profiles')
+        .update({ status: 'active' }).eq('id', uid);
+      if (!error) renderAdminPanel(container);
+      else { btn.disabled = false; btn.textContent = '✓ אשר'; alert('שגיאה: ' + error.message); }
+    });
+  });
+
+  container.querySelectorAll('.reject-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('לדחות את הבקשה?')) return;
+      const uid = btn.dataset.uid;
+      btn.disabled = true;
+      const { error } = await _supabase.from('profiles')
+        .update({ status: 'rejected' }).eq('id', uid);
+      if (!error) renderAdminPanel(container);
+      else { btn.disabled = false; alert('שגיאה: ' + error.message); }
+    });
+  });
+
+  // העתקת קוד
+  document.getElementById('copy-team-code-btn')?.addEventListener('click', () => {
+    navigator.clipboard.writeText(currentTeam?.code ?? '').then(() => {
+      const btn = document.getElementById('copy-team-code-btn');
+      if (btn) { btn.textContent = '✅ הועתק!'; setTimeout(() => { btn.textContent = '📋 העתק קוד'; }, 2000); }
+    });
+  });
+}
