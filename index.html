@@ -4,47 +4,73 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-
   <title>RightPace — מערכת ביצועים לספורטאי עילית</title>
   <meta name="description" content="פלטפורמת ניהול ביצועים לספורטאי נוער תחרותיים — עומס, תחושה, מנטל, תזונה ושיקום בממשק אחד." />
-
   <!-- PWA -->
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#7c3aed" />
   <meta name="mobile-web-app-capable" content="yes" />
-
   <!-- iOS PWA -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="RightPace" />
   <link rel="apple-touch-icon" href="/icon-192.png" />
-
   <!-- Open Graph -->
   <meta property="og:title"       content="RightPace" />
   <meta property="og:description" content="מערכת ביצועים לספורטאי עילית" />
   <meta property="og:image"       content="/icon-512.png" />
   <meta property="og:type"        content="website" />
-
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-
   <!-- Supabase — no defer: must be available synchronously before app.js -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-
   <!-- Styles -->
   <link rel="stylesheet" href="index.css" />
+  <style>
+    /* ─── Splash loader ─────────────────────────────── */
+    #splash-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      background: var(--bg-primary, #0f0a1e);
+      transition: opacity 0.4s ease, visibility 0.4s ease;
+    }
+    #splash-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .splash-icon   { font-size: 3rem; margin-bottom: 0.75rem; animation: pulse 1.5s ease infinite; }
+    .splash-title  { font-size: 1.8rem; font-weight: 700; color: #fff; margin: 0 0 0.4rem; }
+    .splash-sub    { font-size: 0.95rem; color: rgba(255,255,255,0.5); margin: 0 0 1.5rem; }
+    .splash-bar    { width: 180px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
+    .splash-fill   { height: 100%; width: 0; background: linear-gradient(90deg,#7c3aed,#a855f7); border-radius: 4px; animation: load-bar 1.8s ease forwards; }
+    @keyframes load-bar { to { width: 100%; } }
+    @keyframes pulse    { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.1); } }
+  </style>
 </head>
 <body>
-
-  <!-- =========================================================
-    DEV PANEL — destroyed at runtime on non-localhost
-    (enforceProductionHardening IIFE in app.js Section 1)
-  ========================================================== -->
+  <!-- ═══════════════════════════════════════════════════
+       SPLASH SCREEN — hidden by JS once auth resolves
+  ═══════════════════════════════════════════════════ -->
+  <div id="splash-screen">
+    <div class="splash-icon">⚡</div>
+    <h1 class="splash-title">RightPace</h1>
+    <p class="splash-sub">מאחד מערכות...</p>
+    <div class="splash-bar"><div class="splash-fill"></div></div>
+  </div>
+  <!-- ═══════════════════════════════════════════════════
+       DEV PANEL — destroyed at runtime on non-localhost
+       (enforceProductionHardening IIFE in app.js Section 1)
+  ═══════════════════════════════════════════════════ -->
   <div id="dev-panel" role="complementary" aria-label="Developer Controls">
     <span class="dev-panel-label">🛠 מצב פיתוח</span>
     <div class="dev-panel-controls">
@@ -56,27 +82,14 @@
       <button class="dev-btn" onclick="devRole('pending')">Pending</button>
     </div>
   </div>
-
-  <!-- =========================================================
-    PRIMARY APP ROOT — all view HTML injected here by app.js
-  ========================================================== -->
-  <div id="app-root" role="main" aria-live="polite">
-    <div class="splash-loader">
-      <div class="splash-logo">
-        <div class="splash-icon">⚡</div>
-        <h1 class="splash-title">Mental Power Zen</h1>
-        <p class="splash-subtitle">מאתחל מערכת...</p>
-        <div class="splash-bar"><div class="splash-bar-fill"></div></div>
-      </div>
-    </div>
-  </div>
-
+  <!-- ═══════════════════════════════════════════════════
+       PRIMARY APP ROOT — all view HTML injected here by app.js
+  ═══════════════════════════════════════════════════ -->
+  <div id="app-root" role="main" aria-live="polite"></div>
   <!-- Phase D Extensions: Realtime, Toast, Print -->
   <script src="phase_d_extensions.js" defer></script>
-
   <!-- App Engine -->
   <script src="app.js" defer></script>
-
   <!-- Service Worker registration -->
   <script>
     if ('serviceWorker' in navigator) {
@@ -86,8 +99,13 @@
           .catch(err => console.warn('[SW] registration failed:', err));
       });
     }
+    // Hide splash after max 5 seconds (safety net)
+    window.hideSplash = function() {
+      const el = document.getElementById('splash-screen');
+      if (el) el.classList.add('hidden');
+    };
+    setTimeout(window.hideSplash, 5000);
   </script>
-
   <!-- Dev helpers (stripped in prod) -->
   <script>
     function devRole(role) {
@@ -101,6 +119,5 @@
       if (typeof renderView === 'function') renderView(role);
     }
   </script>
-
 </body>
 </html>
